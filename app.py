@@ -75,7 +75,7 @@ with c2:
     cfg["tardiness_base"] = st.radio(
         "احتساب التأخير من",
         options=["shift_start", "after_grace"],
-        format_func=lambda x: "بداية الدوام (08:00)" if x == "shift_start" else "بعد وقت السماح (08:15)",
+        format_func=lambda x: f"بداية الدوام ({cfg['shift_start']})" if x == "shift_start" else f"بعد وقت السماح ({cfg['shift_start']} + {cfg['grace_minutes']} دقيقة)",
         index=["shift_start","after_grace"].index(cfg["tardiness_base"]),
     )
     cfg["tardiness_rounding"] = st.radio(
