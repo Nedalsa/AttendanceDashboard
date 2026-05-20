@@ -11,42 +11,48 @@ CONFIG_DEFAULT = {
     "shift_start":                        "08:00",
     "shift_end":                          "15:00",
     "grace_minutes":                      15,
-
-    # tardiness_base:
-    #   "shift_start"  → late minutes counted from 08:00
-    #   "after_grace"  → late minutes counted from 08:15 (only the excess)
     "tardiness_base":                     "shift_start",
-
-    # tardiness_rounding:
-    #   "daily"    → round each day independently then sum
-    #   "total"    → sum raw minutes first, round the total once
-    #   "none"     → no rounding, exact minutes
     "tardiness_rounding":                 "daily",
     "tardiness_round_up_to":              15,
-
     "early_departure_tolerance_minutes":  0,
     "early_departure_round_up_to":        15,
-
     "overtime_threshold_minutes":         30,
     "overtime_round_down_to":             30,
     "deduct_tardiness_from_overtime":     True,
-
-    # missing_checkin_action:
-    #   "ignore"  → treat as present, no tardiness calculated
-    #   "absent"  → treat as absent
     "missing_checkin_action":             "ignore",
-
-    # missing_checkout_action:
-    #   "shift_end" → assume left at shift end, calculate accordingly
-    #   "ignore"    → no overtime calculated, tardiness still counts
     "missing_checkout_action":            "ignore",
-
     "absent_status":                      "غائب",
 }
 
 JUSTIFICATION_TYPES = ["غياب مبرر", "تأخير مبرر", "خروج مبكر مبرر"]
+BLANK_VALUES        = {"—", "-", "", "nan", "None", "none"}
 
-BLANK_VALUES = {"—", "-", "", "nan", "None", "none"}
+# ── date helper ───────────────────────────────────────────────────────────────
+
+def normalize_date(val) -> str:
+    """
+    Converts any YYYY/MM/DD or YYYY-MM-DD string to YYYY/MM/DD.
+    Only accepts year-first formats to avoid day/month ambiguity.
+    Returns the original string unchanged if it cannot be parsed.
+    """
+    if val is None:
+        return ""
+    try:
+        if pd.isna(val):
+            return ""
+    except Exception:
+        pass
+    s = str(val).strip()
+    if s in BLANK_VALUES:
+        return ""
+    try:
+        if len(s) == 10 and s[4] in ("/", "-"):
+            dt = pd.to_datetime(s, errors="coerce", yearfirst=True)
+            if not pd.isna(dt):
+                return dt.strftime("%Y/%m/%d")
+    except Exception:
+        pass
+    return s  # return as-is, let downstream catch the error
 
 # ── time helpers ──────────────────────────────────────────────────────────────
 
@@ -66,14 +72,10 @@ def min_to_hhmm(minutes):
     return f"{h:02d}:{m:02d}"
 
 def round_up(n, unit):
-    if unit <= 1:
-        return int(n)
-    return math.ceil(n / unit) * unit
+    return math.ceil(n / unit) * unit if unit > 1 else int(n)
 
 def round_down(n, unit):
-    if unit <= 1:
-        return int(n)
-    return math.floor(n / unit) * unit
+    return math.floor(n / unit) * unit if unit > 1 else int(n)
 
 def is_blank(val):
     return str(val).strip() in BLANK_VALUES
@@ -85,13 +87,22 @@ def load_attendance(file) -> pd.DataFrame:
     df["رقم الموظف"] = pd.to_numeric(df["رقم الموظف"], errors="coerce")
     df = df.dropna(subset=["رقم الموظف"])
     df["رقم الموظف"] = df["رقم الموظف"].astype(int)
+    # normalize dates
+    df["التاريخ"] = df["التاريخ"].apply(normalize_date)
     return df.reset_index(drop=True)
 
 def load_exceptions(file):
-    xl = pd.ExcelFile(file)
+    xl     = pd.ExcelFile(file)
     sheets = xl.sheet_names
     df_hol = xl.parse(sheets[0], dtype=str) if len(sheets) >= 1 else pd.DataFrame()
     df_ind = xl.parse(sheets[1], dtype=str) if len(sheets) >= 2 else pd.DataFrame()
+    # normalize dates in both sheets
+    if not df_hol.empty:
+        col = df_hol.columns[0]
+        df_hol[col] = df_hol[col].apply(normalize_date)
+    if not df_ind.empty and len(df_ind.columns) >= 2:
+        date_col = df_ind.columns[1]
+        df_ind[date_col] = df_ind[date_col].apply(normalize_date)
     return df_hol, df_ind
 
 # ── lookup builders ───────────────────────────────────────────────────────────
@@ -135,20 +146,20 @@ def process_record(row: dict, holidays: set, just_map: dict, cfg: dict) -> dict:
     status = str(row.get("الحالة",    "")).strip()
 
     out = {
-        "الحالة_الفعلية":    status,
-        "عطلة_رسمية":        False,
-        "غياب_مبرر":         False,
-        "تأخير_خام":         0,
-        "تأخير_مقرب":        0,
-        "تأخير_مبرر":        False,
-        "مبكر_خام":          0,
-        "مبكر_مقرب":         0,
-        "مبكر_مبرر":         False,
-        "اضافي_خام":         0,
-        "اضافي_مقرب":        0,
-        "اضافي_صافي":        0,
-        "مدة_العمل_دقيقة":   None,
-        "ملاحظة":            "",
+        "الحالة_الفعلية":  status,
+        "عطلة_رسمية":      False,
+        "غياب_مبرر":       False,
+        "تأخير_خام":       0,
+        "تأخير_مقرب":      0,
+        "تأخير_مبرر":      False,
+        "مبكر_خام":        0,
+        "مبكر_مقرب":       0,
+        "مبكر_مبرر":       False,
+        "اضافي_خام":       0,
+        "اضافي_مقرب":      0,
+        "اضافي_صافي":      0,
+        "مدة_العمل_دقيقة": None,
+        "ملاحظة":          "",
     }
 
     # ① عطلة رسمية ─────────────────────────────────────────────────────────
@@ -173,7 +184,6 @@ def process_record(row: dict, holidays: set, just_map: dict, cfg: dict) -> dict:
     cin_missing  = is_blank(cin)
     cout_missing = is_blank(cout)
 
-    # حاضر بدون دخول
     if cin_missing:
         if cfg["missing_checkin_action"] == "absent":
             out["الحالة_الفعلية"] = "غياب غير مبرر"
@@ -185,41 +195,28 @@ def process_record(row: dict, holidays: set, just_map: dict, cfg: dict) -> dict:
 
     cin_m = hhmm_to_min(cin)
 
-    # حاضر بدون خروج
     if cout_missing:
         out["ملاحظة"] = "خروج غير مسجل"
-        if cfg["missing_checkout_action"] == "shift_end":
-            cout_m = shift_end
-        else:
-            cout_m = None
+        cout_m = hhmm_to_min(cfg["shift_end"]) if cfg["missing_checkout_action"] == "shift_end" else None
     else:
         cout_m = hhmm_to_min(cout)
 
     # ── تأخير ────────────────────────────────────────────────────────────
     late_threshold = shift_start + grace
     if cin_m > late_threshold:
-        if cfg["tardiness_base"] == "after_grace":
-            raw_tard = cin_m - late_threshold
-        else:
-            raw_tard = cin_m - shift_start
-
+        raw_tard = cin_m - (late_threshold if cfg["tardiness_base"] == "after_grace" else shift_start)
         out["تأخير_خام"] = raw_tard
-
         if "تأخير مبرر" in justs:
             out["تأخير_مبرر"] = True
         else:
-            if cfg["tardiness_rounding"] == "daily":
+            if cfg["tardiness_rounding"] in ("daily",):
                 out["تأخير_مقرب"] = round_up(raw_tard, cfg["tardiness_round_up_to"])
-            elif cfg["tardiness_rounding"] == "none":
-                out["تأخير_مقرب"] = raw_tard
             else:
-                # total mode — store raw, will be rounded at summary level
-                out["تأخير_مقرب"] = raw_tard
+                out["تأخير_مقرب"] = raw_tard  # total/none → raw, rounded at summary
 
     # ── مبكر وإضافي ──────────────────────────────────────────────────────
     if cout_m is not None:
         out["مدة_العمل_دقيقة"] = cout_m - cin_m
-
         tol = cfg["early_departure_tolerance_minutes"]
         if cout_m < shift_end - tol:
             raw_early = shift_end - cout_m
@@ -228,7 +225,6 @@ def process_record(row: dict, holidays: set, just_map: dict, cfg: dict) -> dict:
                 out["مبكر_مبرر"] = True
             else:
                 out["مبكر_مقرب"] = round_up(raw_early, cfg["early_departure_round_up_to"])
-
         if cout_m > shift_end + cfg["overtime_threshold_minutes"]:
             raw_ot = cout_m - shift_end
             out["اضافي_خام"]  = raw_ot
@@ -247,26 +243,22 @@ def process_record(row: dict, holidays: set, just_map: dict, cfg: dict) -> dict:
 def run(df_att, df_hol, df_ind, cfg):
     holidays = build_holidays(df_hol)
     just_map = build_just_map(df_ind)
-
     rows     = [process_record(r, holidays, just_map, cfg)
                 for r in df_att.to_dict("records")]
     computed = pd.DataFrame(rows)
     detail   = pd.concat([df_att.reset_index(drop=True), computed], axis=1)
     detail["الشهر"] = detail["التاريخ"].astype(str).str[:7]
-
-    summary = _summarise(detail, cfg)
-    return detail, summary
+    return detail, _summarise(detail, cfg)
 
 
 def _summarise(detail, cfg):
     working = detail[~detail["عطلة_رسمية"]].copy()
-    result  = (
+    return (
         working
         .groupby(["رقم الموظف", "اسم الموظف", "المديرية"], as_index=False)
         .apply(_agg_employee, cfg=cfg)
         .reset_index(drop=True)
     )
-    return result
 
 
 def _agg_employee(g, cfg):
@@ -276,10 +268,11 @@ def _agg_employee(g, cfg):
     abs_unj = (g["الحالة_الفعلية"] == "غياب غير مبرر").sum()
     abs_jus = g["غياب_مبرر"].sum()
 
-    # تأخير — التراكمي يُقرَّب مرة واحدة على الإجمالي
     raw_tard_total = int(g["تأخير_خام"].sum())
     if cfg["tardiness_rounding"] == "total":
         tard = round_up(raw_tard_total, cfg["tardiness_round_up_to"])
+    elif cfg["tardiness_rounding"] == "none":
+        tard = raw_tard_total
     else:
         tard = int(g["تأخير_مقرب"].sum())
 
