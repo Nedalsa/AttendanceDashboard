@@ -63,7 +63,7 @@ st.subheader("② إعدادات الدوام")
 
 cfg = st.session_state.cfg
 
-c1, c2, c3 = st.columns(3)
+c1, c2, c3, c4 = st.columns(4)
 with c1:
     cfg["shift_start"] = st.text_input("بداية الدوام", value=cfg["shift_start"])
     cfg["shift_end"]   = st.text_input("نهاية الدوام",  value=cfg["shift_end"])
@@ -113,6 +113,19 @@ with c3:
         index=["ignore","shift_end"].index(cfg["missing_checkout_action"]),
     )
 
+with c4:
+    cfg["early_departure_tolerance_minutes"] = st.number_input(
+        "سماح الخروج المبكر (د)",
+        min_value=0, max_value=60,
+        value=int(cfg["early_departure_tolerance_minutes"]),
+        step=5,
+    )
+    cfg["early_departure_round_up_to"] = st.selectbox(
+        "تقريب الخروج المبكر لأعلى (د)",
+        [1, 15, 30, 60],
+        index=[1,15,30,60].index(int(cfg["early_departure_round_up_to"])),
+    )
+    
 cfg["deduct_tardiness_from_overtime"] = st.checkbox(
     "طرح التأخير من الإضافي الصافي",
     value=bool(cfg["deduct_tardiness_from_overtime"]),
