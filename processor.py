@@ -31,20 +31,27 @@ BLANK_VALUES        = {"—", "-", "", "nan", "None", "none"}
 
 def normalize_date(val) -> str:
     """
-    Converts any YYYY/MM/DD or YYYY-MM-DD string to YYYY/MM/DD.
-    Only accepts year-first formats to avoid day/month ambiguity.
-    Returns the original string unchanged if it cannot be parsed.
+    يحول التاريخ إلى صيغة YYYY/MM/DD.
+    يقبل:
+    - YYYY/MM/DD
+    - YYYY-MM-DD
+    - DD/MM/YYYY فقط إذا كان اليوم أكبر من 12 حتى لا يحدث لبس.
     """
     if val is None:
         return ""
+
     try:
         if pd.isna(val):
             return ""
     except Exception:
         pass
+
     s = str(val).strip()
+
     if s in BLANK_VALUES:
         return ""
+
+    # إذا كان التاريخ يبدأ بالسنة: 2026/04/14 أو 2026-04-14
     try:
         if len(s) == 10 and s[4] in ("/", "-"):
             dt = pd.to_datetime(s, errors="coerce", yearfirst=True)
@@ -52,8 +59,25 @@ def normalize_date(val) -> str:
                 return dt.strftime("%Y/%m/%d")
     except Exception:
         pass
-    return s  # return as-is, let downstream catch the error
 
+    # إذا كان التاريخ بالشكل: 14/04/2026
+    # نقبله فقط إذا كان الجزء الأول أكبر من 12 لأنه واضح أنه يوم وليس شهر
+    try:
+        parts = s.replace("-", "/").split("/")
+        if len(parts) == 3:
+            p1, p2, p3 = parts
+            if len(p3) == 4 and p1.isdigit() and p2.isdigit():
+                day = int(p1)
+                month = int(p2)
+
+                if day > 12 and 1 <= month <= 12:
+                    dt = pd.to_datetime(s, errors="coerce", dayfirst=True)
+                    if not pd.isna(dt):
+                        return dt.strftime("%Y/%m/%d")
+    except Exception:
+        pass
+
+    return s
 # ── time helpers ──────────────────────────────────────────────────────────────
 
 def hhmm_to_min(val):
