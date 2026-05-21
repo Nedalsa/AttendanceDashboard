@@ -38,14 +38,14 @@ with col_a:
 with col_b:
     exc_file = st.file_uploader(
         "ملف الاستثناءات (اختياري)", type=["xlsx","xls"],
-        help="شيت ١: العطل الرسمية | شيت ٢: المبررات الفردية — التاريخ بصيغة YYYY/MM/DD",
+        help="شيت واحد: المبررات الفردية — السنة والشهر واليوم في أعمدة منفصلة",
     )
 
 with st.expander("📥 تحميل قالب ملف الاستثناءات"):
     st.markdown("""
 التاريخ يجب أن يكون بصيغة `YYYY/MM/DD` — مثال: `2026/04/01`
 
-**شيت ١ — العطل الرسمية** | **شيت ٢ — المبررات الفردية**
+شيت واحد فقط: **المبررات الفردية**
 
 أنواع مقبولة: `غياب مبرر` / `تأخير مبرر` / `خروج مبكر مبرر`
     """)
@@ -63,194 +63,60 @@ st.subheader("② إعدادات الدوام")
 
 cfg = st.session_state.cfg
 
-st.info(
-    "اضبط أوقات الدوام وطريقة احتساب التأخير والخروج المبكر والإضافي. "
-    "القيم المختارة هنا ستستخدم مباشرة في التقرير."
-)
+c1, c2, c3 = st.columns(3)
+with c1:
+    cfg["shift_start"] = st.text_input("بداية الدوام", value=cfg["shift_start"])
+    cfg["shift_end"]   = st.text_input("نهاية الدوام",  value=cfg["shift_end"])
+    cfg["grace_minutes"] = st.number_input(
+        "دقائق السماح للدخول", min_value=0, max_value=60,
+        value=int(cfg["grace_minutes"]), step=5)
 
-# ─────────────────────────────
-# 1) أوقات الدوام الأساسية
-# ─────────────────────────────
-with st.expander("① أوقات الدوام الأساسية", expanded=True):
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        cfg["shift_start"] = st.text_input(
-            "بداية الدوام",
-            value=cfg["shift_start"],
-            help="مثال: 08:00"
-        )
-
-    with c2:
-        cfg["shift_end"] = st.text_input(
-            "نهاية الدوام",
-            value=cfg["shift_end"],
-            help="مثال: 15:00"
-        )
-
-    with c3:
-        cfg["grace_minutes"] = st.number_input(
-            "دقائق السماح",
-            min_value=0,
-            max_value=120,
-            value=int(cfg["grace_minutes"]),
-            step=5,
-            help="مثال: إذا بداية الدوام 08:00 والسماح 15 دقيقة، لا يحسب التأخير قبل 08:15"
-        )
-
-    st.caption(
-        f"حسب الإعدادات الحالية: بداية الدوام {cfg['shift_start']}، "
-        f"نهاية الدوام {cfg['shift_end']}، والسماح {cfg['grace_minutes']} دقيقة."
-    )
-
-
-# ─────────────────────────────
-# 2) إعدادات التأخير
-# ─────────────────────────────
-with st.expander("② إعدادات التأخير", expanded=True):
-    st.markdown("#### احتساب التأخير")
-
+with c2:
     cfg["tardiness_base"] = st.radio(
         "احتساب التأخير من",
         options=["shift_start", "after_grace"],
-        format_func=lambda x: {
-            "shift_start": f"من بداية الدوام ({cfg['shift_start']})",
-            "after_grace": f"بعد وقت السماح ({cfg['shift_start']} + {cfg['grace_minutes']} دقيقة)",
-        }[x],
-        index=["shift_start", "after_grace"].index(cfg["tardiness_base"]),
-        horizontal=False,
-        help="إذا اخترت بعد وقت السماح، فالموظف الذي يدخل 08:20 مع سماح حتى 08:15 يحسب عليه 5 دقائق فقط."
+        format_func=lambda x: "بداية الدوام (08:00)" if x == "shift_start" else "بعد وقت السماح (08:15)",
+        index=["shift_start","after_grace"].index(cfg["tardiness_base"]),
     )
-
-    st.markdown("#### طريقة تجميع التأخير")
-
     cfg["tardiness_rounding"] = st.radio(
         "طريقة احتساب التأخير",
         options=["daily", "total", "none"],
         format_func=lambda x: {
-            "daily": "تقريب يومي: كل يوم منفردا",
-            "total": "تقريب تراكمي: مجموع الشهر",
-            "none": "بدون تقريب: دقيقة بدقيقة",
+            "daily": "تقريب يومي (كل يوم منفرداً)",
+            "total": "تقريب تراكمي (مجموع الشهر)",
+            "none":  "بدون تقريب (دقيقة بدقيقة)",
         }[x],
-        index=["daily", "total", "none"].index(cfg["tardiness_rounding"]),
-        horizontal=False,
-        help="التقريب اليومي أشد، والتقريب التراكمي أعدل غالبا، وبدون تقريب يعطي الدقائق الفعلية."
+        index=["daily","total","none"].index(cfg["tardiness_rounding"]),
     )
-
     if cfg["tardiness_rounding"] != "none":
         cfg["tardiness_round_up_to"] = st.selectbox(
-            "تقريب التأخير لأعلى",
-            [1, 15, 30, 60],
-            index=[1, 15, 30, 60].index(int(cfg["tardiness_round_up_to"])),
-            format_func=lambda x: "بدون تقريب فعلي" if x == 1 else f"{x} دقيقة",
-        )
-    else:
-        cfg["tardiness_round_up_to"] = 1
+            "تقريب التأخير لأعلى (د)", [1,15,30,60],
+            index=[1,15,30,60].index(int(cfg["tardiness_round_up_to"])))
 
-    st.caption(
-        "مثال: إذا كان التأخير 7 دقائق والتقريب 15 دقيقة، يصبح التأخير المحتسب 15 دقيقة."
+with c3:
+    cfg["overtime_threshold_minutes"] = st.number_input(
+        "حد الإضافي (د)", min_value=0, max_value=120,
+        value=int(cfg["overtime_threshold_minutes"]), step=15)
+    cfg["overtime_round_down_to"] = st.selectbox(
+        "تقريب الإضافي لأسفل (د)", [1,15,30,60],
+        index=[1,15,30,60].index(int(cfg["overtime_round_down_to"])))
+    cfg["missing_checkin_action"] = st.radio(
+        "حاضر بدون تسجيل دخول",
+        options=["ignore", "absent"],
+        format_func=lambda x: "تنبيه فقط" if x == "ignore" else "احتسابه غائباً",
+        index=["ignore","absent"].index(cfg["missing_checkin_action"]),
+    )
+    cfg["missing_checkout_action"] = st.radio(
+        "حاضر بدون تسجيل خروج",
+        options=["ignore", "shift_end"],
+        format_func=lambda x: "تنبيه فقط" if x == "ignore" else "اعتبار الخروج نهاية الدوام",
+        index=["ignore","shift_end"].index(cfg["missing_checkout_action"]),
     )
 
-
-# ─────────────────────────────
-# 3) إعدادات الخروج المبكر
-# ─────────────────────────────
-with st.expander("③ إعدادات الخروج المبكر", expanded=True):
-    c1, c2 = st.columns(2)
-
-    with c1:
-        cfg["early_departure_tolerance_minutes"] = st.number_input(
-            "سماح الخروج المبكر",
-            min_value=0,
-            max_value=120,
-            value=int(cfg["early_departure_tolerance_minutes"]),
-            step=5,
-            help="مثال: إذا نهاية الدوام 15:00 والسماح 5 دقائق، فالخروج 14:55 لا يحسب مبكرا."
-        )
-
-    with c2:
-        cfg["early_departure_round_up_to"] = st.selectbox(
-            "تقريب الخروج المبكر لأعلى",
-            [1, 15, 30, 60],
-            index=[1, 15, 30, 60].index(int(cfg["early_departure_round_up_to"])),
-            format_func=lambda x: "بدون تقريب فعلي" if x == 1 else f"{x} دقيقة",
-        )
-
-    st.caption(
-        "هذا الإعداد مهم حتى لا يتم احتساب خروج مثل 14:59 أو 14:58 كخروج مبكر كبير بسبب التقريب."
-    )
-
-
-# ─────────────────────────────
-# 4) إعدادات الإضافي
-# ─────────────────────────────
-with st.expander("④ إعدادات الإضافي", expanded=True):
-    c1, c2 = st.columns(2)
-
-    with c1:
-        cfg["overtime_threshold_minutes"] = st.number_input(
-            "حد الإضافي",
-            min_value=0,
-            max_value=180,
-            value=int(cfg["overtime_threshold_minutes"]),
-            step=15,
-            help="مثال: إذا نهاية الدوام 15:00 وحد الإضافي 30 دقيقة، يبدأ الإضافي بعد 15:30."
-        )
-
-    with c2:
-        cfg["overtime_round_down_to"] = st.selectbox(
-            "تقريب الإضافي لأسفل",
-            [1, 15, 30, 60],
-            index=[1, 15, 30, 60].index(int(cfg["overtime_round_down_to"])),
-            format_func=lambda x: "بدون تقريب فعلي" if x == 1 else f"{x} دقيقة",
-        )
-
-    cfg["deduct_tardiness_from_overtime"] = st.checkbox(
-        "طرح التأخير من الإضافي الصافي",
-        value=bool(cfg["deduct_tardiness_from_overtime"]),
-        help="إذا كان الموظف متأخرا ولديه إضافي في نفس اليوم، يتم خصم التأخير من الإضافي."
-    )
-
-    st.caption(
-        "الإضافي يحسب بعد نهاية الدوام وحد الإضافي، ثم يقرب للأسفل حسب الإعداد المختار."
-    )
-
-
-# ─────────────────────────────
-# 5) الحالات غير المكتملة
-# ─────────────────────────────
-with st.expander("⑤ الحالات غير المكتملة", expanded=False):
-    c1, c2 = st.columns(2)
-
-    with c1:
-        cfg["missing_checkin_action"] = st.radio(
-            "حاضر بدون تسجيل دخول",
-            options=["ignore", "absent"],
-            format_func=lambda x: {
-                "ignore": "تنبيه فقط",
-                "absent": "احتسابه غائبا",
-            }[x],
-            index=["ignore", "absent"].index(cfg["missing_checkin_action"]),
-            help="الأفضل غالبا: تنبيه فقط، حتى تتم مراجعة الحالة يدويا."
-        )
-
-    with c2:
-        cfg["missing_checkout_action"] = st.radio(
-            "حاضر بدون تسجيل خروج",
-            options=["ignore", "shift_end"],
-            format_func=lambda x: {
-                "ignore": "تنبيه فقط",
-                "shift_end": "اعتبار الخروج نهاية الدوام",
-            }[x],
-            index=["ignore", "shift_end"].index(cfg["missing_checkout_action"]),
-            help="الأفضل غالبا: تنبيه فقط، لأن افتراض وقت خروج قد يعطي نتيجة غير دقيقة."
-        )
-
-    st.caption(
-        "هذه الحالات تظهر في التقرير مع ملاحظة حتى يمكن مراجعتها لاحقا."
-    )
-
-
+cfg["deduct_tardiness_from_overtime"] = st.checkbox(
+    "طرح التأخير من الإضافي الصافي",
+    value=bool(cfg["deduct_tardiness_from_overtime"]),
+)
 st.session_state.cfg = cfg
 st.divider()
 
@@ -261,11 +127,10 @@ if st.button("▶ معالجة البيانات", type="primary", disabled=(att_
     with st.spinner("جاري المعالجة..."):
         try:
             df_att = load_attendance(att_file)
-            df_hol = pd.DataFrame(columns=["التاريخ","الوصف"])
             df_ind = pd.DataFrame(columns=["رقم الموظف","التاريخ","النوع","ملاحظة"])
             if exc_file:
-                df_hol, df_ind = load_exceptions(exc_file)
-            detail, summary = run(df_att, df_hol, df_ind, st.session_state.cfg)
+                df_ind = load_exceptions(exc_file)
+            detail, summary = run(df_att, df_ind, st.session_state.cfg)
             st.session_state.excel_bytes = build_excel_report(
                 detail, summary, st.session_state.cfg)
             st.session_state.detail  = detail
@@ -294,3 +159,6 @@ if st.session_state.excel_bytes is not None:
         use_container_width=True,
         type="primary",
     )
+
+st.divider()
+st.caption("Developed by **Nidal Al Saqqa** · نظام تحليل الدوام والحضور")
