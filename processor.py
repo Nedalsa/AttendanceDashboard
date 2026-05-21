@@ -100,8 +100,16 @@ def _join_date_columns(df, year_col, month_col, day_col) -> pd.Series:
 
 
 def _has_split_dates(df) -> bool:
-    cols = list(df.columns)
-    return "السنة" in cols and "اليوم" in cols
+    """Detects split date columns even if headers have extra text like (1-12)."""
+    cols = " | ".join(df.columns)
+    return "السنة" in cols and ("اليوم" in cols or "اليوم" in " ".join(df.columns))
+
+def _find_col(df, keyword) -> str:
+    """Find column name that contains the keyword."""
+    for col in df.columns:
+        if keyword in col:
+            return col
+    return None
 
 
 def load_exceptions(file):
@@ -111,7 +119,10 @@ def load_exceptions(file):
 
     if not df_ind.empty:
         if _has_split_dates(df_ind):
-            df_ind["التاريخ"] = _join_date_columns(df_ind, "السنة", "الشهر", "اليوم")
+            year_col  = _find_col(df_ind, "السنة")
+            month_col = _find_col(df_ind, "الشهر")
+            day_col   = _find_col(df_ind, "اليوم")
+            df_ind["التاريخ"] = _join_date_columns(df_ind, year_col, month_col, day_col)
         else:
             if len(df_ind.columns) >= 2:
                 df_ind["التاريخ"] = df_ind[df_ind.columns[1]].apply(normalize_date)
