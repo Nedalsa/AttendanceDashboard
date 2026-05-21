@@ -21,26 +21,16 @@ CONFIG_DEFAULT = {
     "deduct_tardiness_from_overtime":     True,
     "missing_checkin_action":             "ignore",
     "missing_checkout_action":            "ignore",
-    # overtime_base:
-    #   "shift_end"      → OT minutes counted from shift end (15:00)
-    #   "after_threshold" → OT minutes counted from shift_end + threshold (15:30)
     "overtime_base":                      "shift_end",
     "absent_status":                      "غائب",
 }
 
-JUSTIFICATION_TYPES = ["غياب مبرر", "تأخير مبرر", "خروج مبكر مبرر"]
-
-JUSTIFIED_ABSENCE_TYPES = {"غياب مبرر"}
-BLANK_VALUES        = {"—", "-", "", "nan", "None", "none"}
+JUSTIFICATION_TYPES  = ["غياب مبرر", "تأخير مبرر", "خروج مبكر مبرر"]
+BLANK_VALUES         = {"—", "-", "", "nan", "None", "none"}
 
 # ── date helper ───────────────────────────────────────────────────────────────
 
 def normalize_date(val) -> str:
-    """
-    Converts any YYYY/MM/DD or YYYY-MM-DD string to YYYY/MM/DD.
-    Only accepts year-first formats to avoid day/month ambiguity.
-    Returns the original string unchanged if it cannot be parsed.
-    """
     if val is None:
         return ""
     try:
@@ -58,7 +48,7 @@ def normalize_date(val) -> str:
                 return dt.strftime("%Y/%m/%d")
     except Exception:
         pass
-    return s  # return as-is, let downstream catch the error
+    return s
 
 # ── time helpers ──────────────────────────────────────────────────────────────
 
@@ -93,15 +83,11 @@ def load_attendance(file) -> pd.DataFrame:
     df["رقم الموظف"] = pd.to_numeric(df["رقم الموظف"], errors="coerce")
     df = df.dropna(subset=["رقم الموظف"])
     df["رقم الموظف"] = df["رقم الموظف"].astype(int)
-    # normalize dates
-    df["التاريخ"] = df["التاريخ"].apply(normalize_date)
+    df["التاريخ"]    = df["التاريخ"].apply(normalize_date)
     return df.reset_index(drop=True)
 
-def _join_date_columns(df: pd.DataFrame, year_col, month_col, day_col) -> pd.Series:
-    """
-    Joins three separate year/month/day columns into YYYY/MM/DD strings.
-    Handles both split-column template and legacy single-date-column template.
-    """
+
+def _join_date_columns(df, year_col, month_col, day_col) -> pd.Series:
     def _build(row):
         try:
             y = str(int(float(str(row[year_col])))).zfill(4)
@@ -113,45 +99,42 @@ def _join_date_columns(df: pd.DataFrame, year_col, month_col, day_col) -> pd.Ser
     return df.apply(_build, axis=1)
 
 
-def _has_split_dates(df: pd.DataFrame) -> bool:
-    """Returns True if the dataframe uses split year/month/day columns."""
+def _has_split_dates(df) -> bool:
     cols = list(df.columns)
-    return any(c in cols for c in ["السنة", "الشهر", "اليوم"])
+    return "السنة" in cols and "اليوم" in cols
 
 
 def load_exceptions(file):
-    """
-    Loads the individual justifications file.
-    Sheet 1 = المبررات الفردية
-    Supports both split date columns (السنة/الشهر/اليوم) and single date column.
-    """
     xl     = pd.ExcelFile(file)
     sheets = xl.sheet_names
-    df_ind = xl.parse(sheets[0], dtype=str) if len(sheets) >= 1 else pd.DataFrame()
+    df_ind = xl.parse(sheets[0], dtype=str) if sheets else pd.DataFrame()
 
     if not df_ind.empty:
         if _has_split_dates(df_ind):
             df_ind["التاريخ"] = _join_date_columns(df_ind, "السنة", "الشهر", "اليوم")
         else:
             if len(df_ind.columns) >= 2:
-                date_col = df_ind.columns[1]
-                df_ind["التاريخ"] = df_ind[date_col].apply(normalize_date)
+                df_ind["التاريخ"] = df_ind[df_ind.columns[1]].apply(normalize_date)
+
+        # تأكد من وجود عمود النوع
+        if "النوع" not in df_ind.columns and len(df_ind.columns) >= 3:
+            df_ind = df_ind.rename(columns={df_ind.columns[2]: "النوع"})
 
     return df_ind
 
-# ── lookup builders ───────────────────────────────────────────────────────────
+# ── lookup builder ────────────────────────────────────────────────────────────
 
 def build_just_map(df_ind: pd.DataFrame) -> dict:
     result = {}
     if df_ind is None or df_ind.empty:
         return result
-    cols = list(df_ind.columns)
     for _, row in df_ind.iterrows():
         try:
-            emp   = int(float(str(row[cols[0]])))
-            date  = str(row[cols[1]]).strip()
-            jtype = str(row[cols[2]]).strip()
-            result.setdefault((emp, date), []).append(jtype)
+            emp   = int(float(str(row[df_ind.columns[0]])))
+            date  = str(row["التاريخ"]).strip()
+            jtype = str(row["النوع"]).strip()
+            if emp and date and jtype not in ("nan", ""):
+                result.setdefault((emp, date), []).append(jtype)
         except Exception:
             continue
     return result
@@ -189,10 +172,9 @@ def process_record(row: dict, just_map: dict, cfg: dict) -> dict:
         "ملاحظة":          "",
     }
 
-    # ① مبررات فردية ───────────────────────────────────────────────────────
     justs = just_map.get((emp, date), [])
 
-    # ③ غائب ────────────────────────────────────────────────────────────────
+    # ── غائب ─────────────────────────────────────────────────────────────
     if status == cfg["absent_status"]:
         if "غياب مبرر" in justs:
             out["غياب_مبرر"]      = True
@@ -201,7 +183,7 @@ def process_record(row: dict, just_map: dict, cfg: dict) -> dict:
             out["الحالة_الفعلية"] = "غياب غير مبرر"
         return out
 
-    # ④ حاضر ────────────────────────────────────────────────────────────────
+    # ── حاضر ─────────────────────────────────────────────────────────────
     cin_missing  = is_blank(cin)
     cout_missing = is_blank(cout)
 
@@ -230,14 +212,15 @@ def process_record(row: dict, just_map: dict, cfg: dict) -> dict:
         if "تأخير مبرر" in justs:
             out["تأخير_مبرر"] = True
         else:
-            if cfg["tardiness_rounding"] in ("daily",):
+            if cfg["tardiness_rounding"] == "daily":
                 out["تأخير_مقرب"] = round_up(raw_tard, cfg["tardiness_round_up_to"])
             else:
-                out["تأخير_مقرب"] = raw_tard  # total/none → raw, rounded at summary
+                out["تأخير_مقرب"] = raw_tard
 
     # ── مبكر وإضافي ──────────────────────────────────────────────────────
     if cout_m is not None:
         out["مدة_العمل_دقيقة"] = cout_m - cin_m
+
         tol = cfg["early_departure_tolerance_minutes"]
         if cout_m < shift_end - tol:
             raw_early = shift_end - cout_m
@@ -246,12 +229,10 @@ def process_record(row: dict, just_map: dict, cfg: dict) -> dict:
                 out["مبكر_مبرر"] = True
             else:
                 out["مبكر_مقرب"] = round_up(raw_early, cfg["early_departure_round_up_to"])
+
         ot_threshold = shift_end + cfg["overtime_threshold_minutes"]
         if cout_m > ot_threshold:
-            if cfg["overtime_base"] == "after_threshold":
-                raw_ot = cout_m - ot_threshold
-            else:
-                raw_ot = cout_m - shift_end
+            raw_ot = cout_m - (ot_threshold if cfg["overtime_base"] == "after_threshold" else shift_end)
             out["اضافي_خام"]  = raw_ot
             out["اضافي_مقرب"] = round_down(raw_ot, cfg["overtime_round_down_to"])
 
@@ -265,20 +246,15 @@ def process_record(row: dict, just_map: dict, cfg: dict) -> dict:
 
 # ── pipeline ──────────────────────────────────────────────────────────────────
 
-def build_just_map(df_ind: pd.DataFrame) -> dict:
-    result = {}
-    if df_ind is None or df_ind.empty:
-        return result
-    cols = list(df_ind.columns)
-    for _, row in df_ind.iterrows():
-        try:
-            emp   = int(float(str(row[cols[0]])))
-            date  = str(row["التاريخ"]).strip()
-            jtype = str(row["النوع"]).strip()
-            result.setdefault((emp, date), []).append(jtype)
-        except Exception:
-            continue
-    return result
+def run(df_att, df_ind, cfg):
+    just_map = build_just_map(df_ind)
+    rows     = [process_record(r, just_map, cfg)
+                for r in df_att.to_dict("records")]
+    computed = pd.DataFrame(rows)
+    detail   = pd.concat([df_att.reset_index(drop=True), computed], axis=1)
+    detail["الشهر"]      = detail["التاريخ"].astype(str).str[:7]
+    detail["عطلة_رسمية"] = False
+    return detail, _summarise(detail, cfg)
 
 
 def _summarise(detail, cfg):
