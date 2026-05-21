@@ -265,15 +265,20 @@ def process_record(row: dict, just_map: dict, cfg: dict) -> dict:
 
 # ── pipeline ──────────────────────────────────────────────────────────────────
 
-def run(df_att, df_ind, cfg):
-    just_map = build_just_map(df_ind)
-    rows     = [process_record(r, just_map, cfg)
-                for r in df_att.to_dict("records")]
-    computed = pd.DataFrame(rows)
-    detail   = pd.concat([df_att.reset_index(drop=True), computed], axis=1)
-    detail["الشهر"] = detail["التاريخ"].astype(str).str[:7]
-    detail["عطلة_رسمية"] = False  # kept for backward compat
-    return detail, _summarise(detail, cfg)
+def build_just_map(df_ind: pd.DataFrame) -> dict:
+    result = {}
+    if df_ind is None or df_ind.empty:
+        return result
+    cols = list(df_ind.columns)
+    for _, row in df_ind.iterrows():
+        try:
+            emp   = int(float(str(row[cols[0]])))
+            date  = str(row["التاريخ"]).strip()
+            jtype = str(row["النوع"]).strip()
+            result.setdefault((emp, date), []).append(jtype)
+        except Exception:
+            continue
+    return result
 
 
 def _summarise(detail, cfg):
