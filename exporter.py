@@ -51,12 +51,12 @@ SUMMARY_COLS = [
     ("رقم الموظف",          "رقم الموظف",          12),
     ("اسم الموظف",          "اسم الموظف",           20),
     ("المديرية",             "المديرية",              22),
-    ("أيام الحضور",         "أيام_عمل_متوقعة",       13),
+    ("أيام متوقعة",         "أيام_عمل_متوقعة",       13),
     ("أيام حضور",           "أيام_حضور",              12),
     ("غياب غير مبرر",       "غياب_غير_مبرر",          16),
     ("غياب مبرر",           "غياب_مبرر",              14),
     ("تأخير (HH:MM)",       "تأخير_hhmm",             15),
-    ("خروج مبكر (HH:MM)",        "مبكر_hhmm",              15),
+    ("مبكر (HH:MM)",        "مبكر_hhmm",              15),
     ("إضافي صافي (HH:MM)",  "اضافي_صافي_hhmm",        18),
     ("معدل الحضور %",       "معدل_الحضور",             15),
 ]
@@ -69,11 +69,11 @@ DETAIL_COLS = [
     ("أول دخول",        "أول دخول",           10),
     ("آخر خروج",        "آخر خروج",           10),
     ("الحالة الفعلية",  "الحالة_الفعلية",     18),
-    ("خروجم مبكر خام (د)",   "تأخير_خام",          14),
-    ("خروج مبكر محسوب (د)", "تأخير_مقرب",         15),
+    ("تأخير خام (د)",   "تأخير_خام",          14),
+    ("تأخير محسوب (د)", "تأخير_مقرب",         15),
     ("مبرر تأخير",      "تأخير_مبرر",         12),
-    ("خروج مبكر خام (د)",    "مبكر_خام",           13),
-    ("خروج مبكر محسوب (د)",  "مبكر_مقرب",          14),
+    ("مبكر خام (د)",    "مبكر_خام",           13),
+    ("مبكر محسوب (د)",  "مبكر_مقرب",          14),
     ("إضافي صافي (د)",  "اضافي_صافي",         14),
     ("مدة العمل (د)",   "مدة_العمل_دقيقة",    14),
     ("ملاحظة",          "ملاحظة",             24),
@@ -198,71 +198,96 @@ def _write_config(wb, cfg):
 
 def build_template() -> bytes:
     """
-    Exceptions template.
-    Single sheet: المبررات الفردية
-    Dates split into 3 columns (السنة / الشهر / اليوم) to prevent Excel from auto-converting them.
+    Exceptions template — single sheet.
+    Date split into 3 columns (السنة / الشهر / اليوم) matching source YYYY/MM/DD order.
+    3 justification types only. One example row clearly marked.
     """
     wb = Workbook()
     wb.remove(wb.active)
     _no_meta(wb)
 
-    # ── شيت ١: المبررات الفردية ───────────────────────────────────────────
-    ws2 = wb.create_sheet("المبررات الفردية")
-    ws2.sheet_view.rightToLeft = True
+    ws = wb.create_sheet("المبررات الفردية")
+    ws.sheet_view.rightToLeft = True
 
-    ws2.column_dimensions["A"].width = 14
-    ws2.column_dimensions["B"].width = 10
-    ws2.column_dimensions["C"].width = 10
-    ws2.column_dimensions["D"].width = 10
-    ws2.column_dimensions["E"].width = 22
-    ws2.column_dimensions["F"].width = 28
+    # column widths
+    ws.column_dimensions["A"].width = 14   # رقم الموظف
+    ws.column_dimensions["B"].width = 10   # السنة
+    ws.column_dimensions["C"].width = 10   # الشهر
+    ws.column_dimensions["D"].width = 10   # اليوم
+    ws.column_dimensions["E"].width = 22   # النوع
+    ws.column_dimensions["F"].width = 28   # ملاحظة
 
-    _header(ws2.cell(1, 1), "رقم الموظف")
-    _header(ws2.cell(1, 2), "السنة")
-    _header(ws2.cell(1, 3), "الشهر")
-    _header(ws2.cell(1, 4), "اليوم")
-    _header(ws2.cell(1, 5), "النوع")
-    _header(ws2.cell(1, 6), "ملاحظة (اختياري)")
+    # headers
+    _header(ws.cell(1, 1), "رقم الموظف")
+    _header(ws.cell(1, 2), "السنة")
+    _header(ws.cell(1, 3), "الشهر (1-12)")
+    _header(ws.cell(1, 4), "اليوم (1-31)")
+    _header(ws.cell(1, 5), "النوع")
+    _header(ws.cell(1, 6), "ملاحظة (اختياري)")
 
-    # data validation — date columns
-    dv_year2  = DataValidation(type="whole", operator="between", formula1="2020", formula2="2099",
-                                showErrorMessage=True, errorTitle="سنة غير صحيحة", error="أدخل سنة بين 2020 و 2099")
-    dv_month2 = DataValidation(type="whole", operator="between", formula1="1",    formula2="12",
-                                showErrorMessage=True, errorTitle="شهر غير صحيح", error="أدخل شهراً بين 1 و 12")
-    dv_day2   = DataValidation(type="whole", operator="between", formula1="1",    formula2="31",
-                                showErrorMessage=True, errorTitle="يوم غير صحيح", error="أدخل يوماً بين 1 و 31")
-    ws2.add_data_validation(dv_year2);  dv_year2.sqref  = "B2:B1000"
-    ws2.add_data_validation(dv_month2); dv_month2.sqref = "C2:C1000"
-    ws2.add_data_validation(dv_day2);   dv_day2.sqref   = "D2:D1000"
+    # ── Data Validation ───────────────────────────────────────────────────
+    # السنة
+    dv_year = DataValidation(
+        type="whole", operator="between",
+        formula1="2020", formula2="2099",
+        showErrorMessage=True,
+        errorTitle="سنة غير صحيحة",
+        error="أدخل سنة بين 2020 و 2099",
+    )
+    ws.add_data_validation(dv_year)
+    dv_year.sqref = "B2:B1000"
 
-    # data validation — النوع dropdown
+    # الشهر
+    dv_month = DataValidation(
+        type="whole", operator="between",
+        formula1="1", formula2="12",
+        showErrorMessage=True,
+        errorTitle="شهر غير صحيح",
+        error="أدخل شهراً بين 1 و 12",
+    )
+    ws.add_data_validation(dv_month)
+    dv_month.sqref = "C2:C1000"
+
+    # اليوم
+    dv_day = DataValidation(
+        type="whole", operator="between",
+        formula1="1", formula2="31",
+        showErrorMessage=True,
+        errorTitle="يوم غير صحيح",
+        error="أدخل يوماً بين 1 و 31",
+    )
+    ws.add_data_validation(dv_day)
+    dv_day.sqref = "D2:D1000"
+
+    # النوع — قائمة منسدلة
     dv_type = DataValidation(
         type="list",
         formula1='"غياب مبرر,تأخير مبرر,خروج مبكر مبرر"',
         showDropDown=False,
         showErrorMessage=True,
-        errorTitle="قيمة غير صحيحة",
+        errorTitle="نوع غير صحيح",
         error="اختر من القائمة: غياب مبرر / تأخير مبرر / خروج مبكر مبرر",
     )
-    ws2.add_data_validation(dv_type)
+    ws.add_data_validation(dv_type)
     dv_type.sqref = "E2:E1000"
 
-    examples2 = [
-        (15, 2026, 4,  1, "غياب مبرر",      "إجازة مرضية — مثال"),
-        (33, 2026, 4,  6, "تأخير مبرر",     "ظرف طارئ — مثال"),
-        (80, 2026, 4, 10, "خروج مبكر مبرر", "موعد طبي — مثال"),
-    ]
-    for r, (emp, y, m, d, ntype, note) in enumerate(examples2, 2):
-        _cell(ws2.cell(r, 1), emp)
-        _cell(ws2.cell(r, 2), y)
-        _cell(ws2.cell(r, 3), m)
-        _cell(ws2.cell(r, 4), d)
-        _cell(ws2.cell(r, 5), ntype)
-        _cell(ws2.cell(r, 6), note, align=LEFT)
+    # ── صف مثال — مميز باللون ─────────────────────────────────────────────
+    from openpyxl.styles import PatternFill as _PF
+    ex_fill = _PF("solid", start_color="FFF2CC", fgColor="FFF2CC")
+    ex_font = Font(name="Arial", size=9, italic=True, color="7F6000")
+
+    example = [999, 2026, 4, 1, "غياب مبرر", "← مثال فقط — احذف هذا السطر قبل الرفع"]
+    for c, val in enumerate(example, 1):
+        cell = ws.cell(2, c, val)
+        cell.fill      = ex_fill
+        cell.font      = ex_font
+        cell.alignment = CENTER if c < 6 else LEFT
+        cell.border    = _border()
 
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
 
 # ── Main report ───────────────────────────────────────────────────────────────
 
