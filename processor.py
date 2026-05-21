@@ -29,6 +29,8 @@ CONFIG_DEFAULT = {
 }
 
 JUSTIFICATION_TYPES = ["غياب مبرر", "تأخير مبرر", "خروج مبكر مبرر"]
+
+JUSTIFIED_ABSENCE_TYPES = {"غياب مبرر"}
 BLANK_VALUES        = {"—", "-", "", "nan", "None", "none"}
 
 # ── date helper ───────────────────────────────────────────────────────────────
