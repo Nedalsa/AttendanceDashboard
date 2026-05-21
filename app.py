@@ -60,7 +60,7 @@ with st.expander("📥 تحميل قالب ملف الاستثناءات"):
 st.divider()
 
 # ═══════════════════════════════ ② CONFIG ════════════════════════════════════
-st.subheader("② إعدادات الدوام")  →  st.markdown("<h3 style='text-align:right'>② إعدادات الدوام</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align:right'>② إعدادات الدوام</h3>", unsafe_allow_html=True)
 
 cfg = st.session_state.cfg
 
@@ -271,7 +271,7 @@ st.session_state.cfg = cfg
 st.divider()
 
 # ═══════════════════════════════ ③ PROCESS ═══════════════════════════════════
-st.subheader("③ معالجة وتصدير")   →  st.markdown("<h3 style='text-align:right'>③ معالجة وتصدير</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align:right'>③ معالجة وتصدير</h3>", unsafe_allow_html=True)
 
 if st.button("▶ معالجة البيانات", type="primary", disabled=(att_file is None)):
     with st.spinner("جاري المعالجة..."):
