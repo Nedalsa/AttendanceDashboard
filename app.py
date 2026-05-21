@@ -27,7 +27,7 @@ st.caption("ارفع ملفي الدوام والاستثناءات ← اضغط
 st.divider()
 
 # ═══════════════════════════════ ① UPLOADS ═══════════════════════════════════
-st.subheader("① الملفات")
+st.markdown("<h3 style='text-align:right'>① الملفات</h3>", unsafe_allow_html=True)
 
 col_a, col_b = st.columns(2)
 with col_a:
@@ -59,7 +59,7 @@ with st.expander("📥 تحميل قالب ملف الاستثناءات"):
 st.divider()
 
 # ═══════════════════════════════ ② CONFIG ════════════════════════════════════
-st.subheader("② إعدادات الدوام")
+st.markdown("<h3 style='text-align:right'>② إعدادات الدوام</h3>", unsafe_allow_html=True)
 
 # ── initialize session_state keys with defaults ───────────────────────────────
 _defaults = {
@@ -137,9 +137,9 @@ with st.expander("② إعدادات التأخير", expanded=True):
         "طريقة احتساب التأخير",
         options=["daily", "total", "none"],
         format_func=lambda x: {
-            "daily": "تقريب يومي — كل يوم منفرداً (أشد)",
-            "total": "تقريب تراكمي — مجموع الشهر ثم تقريب (أعدل)",
-            "none":  "بدون تقريب — دقيقة بدقيقة (الأدق)",
+            "daily": "تقريب يومي — كل يوم منفرداً ",
+            "total": "تقريب تراكمي — مجموع الشهر ثم تقريب ",
+            "none":  "بدون تقريب — دقيقة بدقيقة ",
         }[x],
         key="cfg_tardiness_rounding",
     )
@@ -174,8 +174,8 @@ with st.expander("④ إعدادات الإضافي", expanded=True):
         "احتساب الإضافي من",
         options=["shift_end", "after_threshold"],
         format_func=lambda x: {
-            "shift_end":       f"من نهاية الدوام ({st.session_state.cfg_shift_end}) — الأشمل",
-            "after_threshold": f"من بعد حد الإضافي ({st.session_state.cfg_shift_end} + {st.session_state.cfg_ot_threshold} د) — الأدق",
+            "shift_end":       f"من نهاية الدوام ({st.session_state.cfg_shift_end})  ",
+            "after_threshold": f"من بعد حد الإضافي ({st.session_state.cfg_shift_end} + {st.session_state.cfg_ot_threshold} د)  ",
         }[x],
         key="cfg_overtime_base",
         help="من نهاية الدوام: خرج 16:00 وحد 30 د → إضافي 60 د. من بعد الحد → 30 د فقط.",
@@ -220,7 +220,7 @@ with st.expander("⑤ الحالات غير المكتملة", expanded=False):
 
 st.divider()
 # ═══════════════════════════════ ③ PROCESS ═══════════════════════════════════
-st.subheader("③ معالجة وتصدير")
+st.markdown("<h3 style='text-align:right'>③ معالجة وتصدير</h3>", unsafe_allow_html=True)
 
 if st.button("▶ معالجة البيانات", type="primary", disabled=(att_file is None)):
     with st.spinner("جاري المعالجة..."):
