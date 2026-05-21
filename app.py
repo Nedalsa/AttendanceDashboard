@@ -27,7 +27,8 @@ st.caption("ارفع ملفي الدوام والاستثناءات ← اضغط
 st.divider()
 
 # ═══════════════════════════════ ① UPLOADS ═══════════════════════════════════
-st.subheader("① الملفات")
+st.markdown("<h3 style='text-align:right'>① الملفات</h3>", unsafe_allow_html=True)
+
 
 col_a, col_b = st.columns(2)
 with col_a:
