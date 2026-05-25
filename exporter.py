@@ -9,7 +9,7 @@ from openpyxl.styles import Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
-# ── styles ────────────────────────────────────────────────────────────────────
+#  styles
 BOLD   = Font(name="Arial", bold=True,  size=10)
 NORMAL = Font(name="Arial", bold=False, size=10)
 ITALIC = Font(name="Arial", italic=True, size=9, color="666666")
@@ -41,11 +41,7 @@ def _no_meta(wb):
     wb.properties.title          = ""
     wb.properties.keywords       = ""
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# COLUMN DEFINITIONS
-# ── (Excel header label, data field name, column width) ──────────────────────
-# تعديل المسميات: غيّر النص في العمود الأول فقط
-# ═══════════════════════════════════════════════════════════════════════════════
+# column definitions
 
 SUMMARY_COLS = [
     ("رقم الموظف",          "رقم الموظف",          12),
@@ -79,7 +75,7 @@ DETAIL_COLS = [
     ("ملاحظة",          "ملاحظة",             24),
 ]
 
-# ── Summary sheet ─────────────────────────────────────────────────────────────
+#  Summary sheet 
 
 def _write_summary(wb, summary):
     ws = wb.create_sheet("ملخص الموظفين")
@@ -105,7 +101,7 @@ def _write_summary(wb, summary):
 
     ws.auto_filter.ref = f"A1:{get_column_letter(len(SUMMARY_COLS))}1"
 
-# ── Detail sheet ──────────────────────────────────────────────────────────────
+#  Detail sheet 
 
 def _write_detail(wb, detail):
     ws = wb.create_sheet("التفصيل اليومي")
@@ -131,7 +127,7 @@ def _write_detail(wb, detail):
 
     ws.auto_filter.ref = f"A1:{get_column_letter(len(DETAIL_COLS))}1"
 
-# ── Stats sheet ───────────────────────────────────────────────────────────────
+#  Stats sheet 
 
 def _write_stats(wb, detail, summary):
     ws = wb.create_sheet("إحصاءات")
@@ -166,7 +162,7 @@ def _write_stats(wb, detail, summary):
         for c, f in enumerate(["المديرية","عدد_الموظفين","غياب_غير_مبرر","اضافي_صافي_دقيقة"], 1):
             _cell(ws.cell(r, c), row.get(f, ""))
 
-# ── Config sheet ──────────────────────────────────────────────────────────────
+#  Config sheet 
 
 def _write_config(wb, cfg):
     ws = wb.create_sheet("الإعدادات المستخدمة")
@@ -194,7 +190,7 @@ def _write_config(wb, cfg):
         _cell(ws.cell(i, 1), label, align=LEFT)
         _cell(ws.cell(i, 2), str(cfg.get(key, "")))
 
-# ── Template ──────────────────────────────────────────────────────────────────
+#  Template 
 
 def build_template() -> bytes:
     """
@@ -225,7 +221,7 @@ def build_template() -> bytes:
     _header(ws.cell(1, 5), "النوع")
     _header(ws.cell(1, 6), "ملاحظة (اختياري)")
 
-    # ── Data Validation ───────────────────────────────────────────────────
+    #  Data Validation 
     # السنة
     dv_year = DataValidation(
         type="whole", operator="between",
@@ -271,7 +267,7 @@ def build_template() -> bytes:
     ws.add_data_validation(dv_type)
     dv_type.sqref = "E2:E1000"
 
-    # ── صف مثال — مميز باللون ─────────────────────────────────────────────
+    #  صف مثال — مميز باللون 
     from openpyxl.styles import PatternFill as _PF
     ex_fill = _PF("solid", start_color="FFF2CC", fgColor="FFF2CC")
     ex_font = Font(name="Arial", size=9, italic=True, color="7F6000")
@@ -289,7 +285,7 @@ def build_template() -> bytes:
     return buf.getvalue()
 
 
-# ── Main report ───────────────────────────────────────────────────────────────
+#  Main report 
 
 def build_excel_report(detail, summary, cfg) -> bytes:
     wb = Workbook()
