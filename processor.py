@@ -5,7 +5,7 @@ Attendance Processor — Core logic, no UI dependencies.
 import math
 import pandas as pd
 
-# ── defaults ──────────────────────────────────────────────────────────────────
+# defaults 
 
 CONFIG_DEFAULT = {
     "shift_start":                        "08:00",
@@ -28,7 +28,7 @@ CONFIG_DEFAULT = {
 JUSTIFICATION_TYPES  = ["غياب مبرر", "تأخير مبرر", "خروج مبكر مبرر"]
 BLANK_VALUES         = {"—", "-", "", "nan", "None", "none"}
 
-# ── date helper ───────────────────────────────────────────────────────────────
+#  date helper
 
 def normalize_date(val) -> str:
     if val is None:
@@ -50,7 +50,7 @@ def normalize_date(val) -> str:
         pass
     return s
 
-# ── time helpers ──────────────────────────────────────────────────────────────
+#  time helpers 
 
 def hhmm_to_min(val):
     if not val or str(val).strip() in BLANK_VALUES:
@@ -76,7 +76,7 @@ def round_down(n, unit):
 def is_blank(val):
     return str(val).strip() in BLANK_VALUES
 
-# ── loaders ───────────────────────────────────────────────────────────────────
+#  loaders 
 
 def load_attendance(file) -> pd.DataFrame:
     df = pd.read_excel(file, dtype=str)
@@ -133,7 +133,7 @@ def load_exceptions(file):
 
     return df_ind
 
-# ── lookup builder ────────────────────────────────────────────────────────────
+#  lookup builder 
 
 def build_just_map(df_ind: pd.DataFrame) -> dict:
     result = {}
@@ -150,7 +150,7 @@ def build_just_map(df_ind: pd.DataFrame) -> dict:
             continue
     return result
 
-# ── record-level processing ───────────────────────────────────────────────────
+#  record-level processing 
 
 def process_record(row: dict, just_map: dict, cfg: dict) -> dict:
     shift_start = hhmm_to_min(cfg["shift_start"])
@@ -185,7 +185,7 @@ def process_record(row: dict, just_map: dict, cfg: dict) -> dict:
 
     justs = just_map.get((emp, date), [])
 
-    # ── غائب ─────────────────────────────────────────────────────────────
+    #  غائب 
     if status == cfg["absent_status"]:
         if "غياب مبرر" in justs:
             out["غياب_مبرر"]      = True
@@ -194,7 +194,7 @@ def process_record(row: dict, just_map: dict, cfg: dict) -> dict:
             out["الحالة_الفعلية"] = "غياب غير مبرر"
         return out
 
-    # ── حاضر ─────────────────────────────────────────────────────────────
+    #  حاضر 
     cin_missing  = is_blank(cin)
     cout_missing = is_blank(cout)
 
@@ -215,7 +215,7 @@ def process_record(row: dict, just_map: dict, cfg: dict) -> dict:
     else:
         cout_m = hhmm_to_min(cout)
 
-    # ── تأخير ────────────────────────────────────────────────────────────
+    #  تأخير 
     late_threshold = shift_start + grace
     if cin_m > late_threshold:
         raw_tard = cin_m - (late_threshold if cfg["tardiness_base"] == "after_grace" else shift_start)
@@ -228,7 +228,7 @@ def process_record(row: dict, just_map: dict, cfg: dict) -> dict:
             else:
                 out["تأخير_مقرب"] = raw_tard
 
-    # ── مبكر وإضافي ──────────────────────────────────────────────────────
+    #  مبكر وإضافي 
     if cout_m is not None:
         out["مدة_العمل_دقيقة"] = cout_m - cin_m
 
@@ -247,7 +247,7 @@ def process_record(row: dict, just_map: dict, cfg: dict) -> dict:
             out["اضافي_خام"]  = raw_ot
             out["اضافي_مقرب"] = round_down(raw_ot, cfg["overtime_round_down_to"])
 
-    # ── إضافي صافي ───────────────────────────────────────────────────────
+    #  إضافي صافي 
     ot = out["اضافي_مقرب"]
     if cfg["deduct_tardiness_from_overtime"] and ot > 0:
         ot = max(0, ot - out["تأخير_مقرب"])
@@ -255,7 +255,7 @@ def process_record(row: dict, just_map: dict, cfg: dict) -> dict:
 
     return out
 
-# ── pipeline ──────────────────────────────────────────────────────────────────
+#  pipeline 
 
 def run(df_att, df_ind, cfg):
     just_map = build_just_map(df_ind)
