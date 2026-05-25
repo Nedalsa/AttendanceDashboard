@@ -15,7 +15,7 @@ st.set_page_config(
 )
 st.markdown("<style>body,.main{direction:rtl}</style>", unsafe_allow_html=True)
 
-# ── session state ─────────────────────────────────────────────────────────────
+# session state
 for key, val in [("detail", None), ("summary", None),
                  ("cfg", CONFIG_DEFAULT.copy()), ("excel_bytes", None)]:
     if key not in st.session_state:
@@ -26,7 +26,7 @@ st.title("📊 نظام تحليل الدوام والحضور")
 st.caption("ارفع ملفي الدوام والاستثناءات ← اضغط معالجة ← حمّل التقرير")
 st.divider()
 
-# ═══════════════════════════════ ① UPLOADS ═══════════════════════════════════
+# uploads
 st.markdown("<h3 style='text-align:right'>① الملفات</h3>", unsafe_allow_html=True)
 
 col_a, col_b = st.columns(2)
@@ -58,10 +58,10 @@ with st.expander("📥 تحميل قالب ملف الاستثناءات"):
 
 st.divider()
 
-# ═══════════════════════════════ ② CONFIG ════════════════════════════════════
+# CONFIG
 st.markdown("<h3 style='text-align:right'>② إعدادات الدوام</h3>", unsafe_allow_html=True)
 
-# ── initialize session_state keys with defaults ───────────────────────────────
+# ── initialize session_state keys with defaults
 _defaults = {
     "cfg_shift_start":                    CONFIG_DEFAULT["shift_start"],
     "cfg_shift_end":                      CONFIG_DEFAULT["shift_end"],
@@ -219,7 +219,7 @@ with st.expander("⑤ الحالات غير المكتملة", expanded=False):
     st.caption("هذه الحالات تظهر في عمود الملاحظة بالتقرير.")
 
 st.divider()
-# ═══════════════════════════════ ③ PROCESS ═══════════════════════════════════
+# process
 st.markdown("<h3 style='text-align:right'>③ معالجة وتصدير</h3>", unsafe_allow_html=True)
 
 if st.button("▶ معالجة البيانات", type="primary", disabled=(att_file is None)):
@@ -260,4 +260,4 @@ if st.session_state.excel_bytes is not None:
     )
 
 st.divider()
-st.caption("Developed by **Nidal Al Saqqa** · نظام تحليل الدوام والحضور")
+st.caption("Nidal Al Saqqa")
