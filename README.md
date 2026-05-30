@@ -16,7 +16,7 @@ Upload your own attendance Excel file to explore the full workflow.
 
 Built to automate monthly attendance reporting across multiple directorates. The tool processes raw biometric export data and produces a structured report ready for HR and payroll use.
 
-Dashboard interface and core logic developed with AI-assisted coding (Claude by Anthropic), based on operational defined and specified by the author.
+Dashboard interface and core logic developed with AI-assisted coding, based on operational defined and specified by the author.
 
 ---
 
